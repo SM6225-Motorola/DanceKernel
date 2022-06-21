@@ -209,6 +209,32 @@ static inline void update_poison_center(struct touch_event_data *tev)
 }
 #endif /* TS_MMI_TOUCH_GESTURE_POISON_EVENT */
 
+#define DOUBLE_TAP_MAX_TIME	(2 * NSEC_PER_SEC)
+
+static void ts_mmi_single_tap_handler(struct ts_mmi_dev *touch_cdev)
+{
+	unsigned char mode_type = touch_cdev->gesture_mode_type;
+	ktime_t now, tmp;
+
+	if (!touch_cdev->single_tap_pressed) {
+		touch_cdev->single_tap_pressed_time = ktime_get_boottime();
+		touch_cdev->single_tap_pressed = true;
+		return;
+	}
+
+	touch_cdev->single_tap_pressed = false;
+
+	now = ktime_get_boottime();
+	tmp = ktime_add(touch_cdev->single_tap_pressed_time,
+			DOUBLE_TAP_MAX_TIME);
+
+	if (ktime_after(now, tmp))
+		return;
+
+	touch_cdev->double_tap_pressed = true;
+	sysfs_notify(&DEV_MMI->kobj, NULL, "double_tap_pressed");
+}
+
 static int ts_mmi_gesture_handler(struct gesture_event_data *gev)
 {
 	int key_code;
@@ -217,6 +243,10 @@ static int ts_mmi_gesture_handler(struct gesture_event_data *gev)
 
 	switch (gev->evcode) {
 	case 1:
+		if (!(mode_type & TS_MMI_GESTURE_SINGLE))
+			return 1;
+
+		ts_mmi_single_tap_handler(touch_cdev);
 		key_code = BTN_TRIGGER_HAPPY3;
 		pr_info("%s: single tap\n", __func__);
 			break;
@@ -236,7 +266,11 @@ static int ts_mmi_gesture_handler(struct gesture_event_data *gev)
 		break;
 	case 4:
 		key_code = BTN_TRIGGER_HAPPY6;
-		pr_info("%s: double tap\n", __func__);
+		input_report_abs(sensor_pdata->input_sensor_dev, ABS_X, gev->evdata.x);
+		input_report_abs(sensor_pdata->input_sensor_dev, ABS_Y, gev->evdata.y);
+		pr_info("%s: double tap; x=%d, y=%d\n", __func__, gev->evdata.x, gev->evdata.y);
+		touch_cdev->double_tap_pressed = true;
+		sysfs_notify(&DEV_MMI->kobj, NULL, "double_tap_pressed");
 		break;
 	default:
 		need2report = false;
