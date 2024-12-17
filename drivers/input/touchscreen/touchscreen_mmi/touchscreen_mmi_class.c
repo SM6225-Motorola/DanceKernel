@@ -338,6 +338,42 @@ static ssize_t gesture_show(struct device *dev,
 
 	return scnprintf(buf, PAGE_SIZE, "%02x\n", touch_cdev->pdata.supported_gesture_type);
 }
+
+static bool _gesture_set(struct ts_mmi_dev *touch_cdev,
+			 unsigned long bit, bool val)
+{
+	bool current_val = touch_cdev->gesture_mode_type & bit;
+
+	if (current_val == val)
+		return false;
+
+	if (val)
+		touch_cdev->gesture_mode_type |= bit;
+	else
+		touch_cdev->gesture_mode_type &= ~bit;
+
+	return val;
+}
+
+static void gesture_sync(struct ts_mmi_dev *touch_cdev)
+{
+	kfifo_put(&touch_cdev->cmd_pipe, TS_MMI_SET_GESTURES);
+	schedule_delayed_work(&touch_cdev->work, 0);
+}
+
+static void gesture_set(struct ts_mmi_dev *touch_cdev,
+			unsigned long bit, bool enable)
+{
+	bool sync;
+
+	mutex_lock(&touch_cdev->extif_mutex);
+	sync = _gesture_set(touch_cdev, bit, enable);
+	mutex_unlock(&touch_cdev->extif_mutex);
+
+	if (sync && !touch_cdev->udfps_pressed && !touch_cdev->double_tap_pressed)
+		gesture_sync(touch_cdev);
+}
+
 static ssize_t gesture_store(struct device *dev,
 			struct device_attribute *attr, const char *buf, size_t size)
 {

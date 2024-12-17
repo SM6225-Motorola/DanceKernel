@@ -240,6 +240,7 @@ static int ts_mmi_gesture_handler(struct gesture_event_data *gev)
 	int key_code;
 	bool need2report = true;
 	struct ts_mmi_dev *touch_cdev = sensor_pdata->touch_cdev;
+	unsigned char mode_type = touch_cdev->gesture_mode_type;
 
 	switch (gev->evcode) {
 	case 1:

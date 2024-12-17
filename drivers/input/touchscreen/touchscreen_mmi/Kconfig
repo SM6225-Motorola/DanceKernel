@@ -59,9 +59,5 @@ config BOARD_USES_DOUBLE_TAP_CTRL
 
 config GTP_DDA_STYLUS
 	bool "Moto GTP DDA stylus"
-	default n
-	help
-	 Say Y here if your panel includes support for GTP DDA stylus.
-	 If unsure, say N.
 
 endif
